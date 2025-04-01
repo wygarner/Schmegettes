@@ -17,7 +17,7 @@ interface CategoryData {
 import React, { useState, useEffect } from 'react';
 
 const JeopardyGame: React.FC = () => {
-  const [gameData, setGameData] = useState<ClueData[] | null>(null);
+  const [_, setGameData] = useState<ClueData[] | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [gameBoard, setGameBoard] = useState<CategoryData[]>([]);
   const [currentClue, setCurrentClue] = useState<ClueData | null>(null);
