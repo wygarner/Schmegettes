@@ -6,8 +6,14 @@ let io;
 export default function handler(req, res) {
   if (req.method === 'GET') {
     if (!io) {
-      // Initialize Socket.io server only once
-      io = new Server(res.socket.server);
+      // Initialize Socket.io server with CORS configuration
+      io = new Server(res.socket.server, {
+        cors: {
+          origin: '*', // Allow all origins, or specify the frontend's origin
+          methods: ['GET', 'POST'],
+          allowedHeaders: ['Content-Type'],
+        },
+      });
 
       // Listen for connections
       io.on('connection', (socket) => {
@@ -27,14 +33,13 @@ export default function handler(req, res) {
       });
     }
 
-    // Required for the WebSocket connection to work
+    // Required for WebSocket connection to work in serverless functions
     res.socket.server.on('upgrade', (request, socket, head) => {
       io.handleUpgrade(request, socket, head, (socket) => {
         io.emit('connection', socket, request);
       });
     });
 
-    // Return response (required by Vercel)
     res.status(200).send('Socket.io server running');
   } else {
     res.status(405).end('Method Not Allowed');

@@ -93,7 +93,9 @@ export default function Board() {
 
   useEffect(() => {
     // Connect to the WebSocket server
-    const socketConnection = io('wss://schmegettes.vercel.app/api/game');
+    const socketConnection = io('https://schmegettes.vercel.app/api/game', {
+      transports: ['websocket'], // You can also specify 'polling' if WebSocket isn't available
+    });
     setSocket(socketConnection);
 
     socketConnection.on('connect', () => {
