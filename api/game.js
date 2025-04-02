@@ -40,6 +40,7 @@ export default function handler(req, res) {
       });
     });
 
+    console.log('Socket.io server initialized');
     res.status(200).send('Socket.io server running');
   } else {
     res.status(405).end('Method Not Allowed');
