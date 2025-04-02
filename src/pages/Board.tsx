@@ -19,11 +19,12 @@ export default function Board() {
   const { state: { clues }} = useLocation() as { state: { clues: ClueData[] } };
   const navigate = useNavigate();
 
-  
   const [activeRound, _] = useState<number>(1);
   const [categories, setCategories] = useState<string[]>([]);
   const [gameBoard, setGameBoard] = useState<CategoryData[]>([]);
   const [score, setScore] = useState<number>(0);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [messages, setMessages] = useState<string[]>([]);
 
   const handleClueSelect = (categoryIndex: number, clueIndex: number): void => {
     const clue = gameBoard[categoryIndex].clues[clueIndex];
@@ -55,6 +56,12 @@ export default function Board() {
     setScore(0);
   };
 
+  const sendMessage = (message: string) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ message }));
+    }
+  };
+
   useEffect(() => {
     const cluesByRound: { [key: number]: ClueData[] } = clues.reduce((acc, clue) => {
       const round = clue.round || 1; // Default to round 1 if not specified
@@ -83,6 +90,36 @@ export default function Board() {
 
   }, [activeRound, clues]);
 
+  useEffect(() => {
+    // Connect to the WebSocket server
+    const socket = new WebSocket('wss://your-vercel-deployment-url/api/game');
+
+    socket.onopen = () => {
+      console.log('Connected to WebSocket server');
+    };
+
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      setMessages((prevMessages) => [...prevMessages, message]);
+    };
+
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    socket.onclose = () => {
+      console.log('Disconnected from WebSocket server');
+    };
+
+    // Store the WebSocket connection in state
+    setWs(socket);
+
+    // Clean up on component unmount
+    return () => {
+      if (socket) socket.close();
+    };
+  }, []);
+
   return (
       <div className="jeopardy-container">
         <div className="jeopardy-header">
@@ -109,11 +146,21 @@ export default function Board() {
             ))}
           </div>
         </div>
+        <div>
+          {messages.map((msg, idx) => (
+            <p key={idx}>{msg}</p>
+          ))}
+        </div>
         <div className="reset-container">
           <button
             onClick={resetGame}
           >
             Reset Game
+          </button>
+          <button
+            onClick={() => sendMessage('Hello from the game board!')}
+          >
+            Send Message
           </button>
         </div>
       </div>
