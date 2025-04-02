@@ -1,5 +1,5 @@
 // api/game.js
-import { Server } from 'ws';
+import WebSocket from 'ws';
 
 let wss; // WebSocket server instance
 const clients = new Set(); // Set to hold connected clients
@@ -8,7 +8,7 @@ export default function handler(req, res) {
   if (req.method === 'GET') {
     if (!wss) {
       // Create WebSocket server on first request
-      wss = new Server({ noServer: true });
+      wss = new WebSocket.Server({ noServer: true });
 
       wss.on('connection', (socket) => {
         clients.add(socket);

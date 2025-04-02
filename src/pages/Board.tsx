@@ -92,7 +92,7 @@ export default function Board() {
 
   useEffect(() => {
     // Connect to the WebSocket server
-    const socket = new WebSocket('wss://your-vercel-deployment-url/api/game');
+    const socket = new WebSocket('wss://schmegettes.vercel.app/api/game');
 
     socket.onopen = () => {
       console.log('Connected to WebSocket server');
