@@ -28,7 +28,6 @@ export default function Lobby() {
   const [players, setPlayers] = useState<string[]>(['Player 1', 'Player 2']);
   const [selectedSeason, setSelectedSeason] = useState<string>('season1');
   const [playerName, setPlayerName] = useState<string>('');
-  const [data, setData] = useState<string[][]>([]);
   const navigate = useNavigate();
 
   const [selectedAirDate, setSelectedAirDate] = useState<string | null>(null);
@@ -139,14 +138,14 @@ export default function Lobby() {
       <button onClick={startGame}>Start Game</button>
 
       <h2>Players in Lobby:</h2>
-      {/* Placeholder for player list */}
       <ul>
-        <li>Player 1</li>
-        <li>Player 2</li>
+        {players.map((player, index) => (
+          <li key={index}>{player}</li>
+        ))}
       </ul>
-
       <label htmlFor="player-name">Change Player Name:</label>
       <input id="player-name" type="text" placeholder="Enter your name" />
+      <button onClick={updatePlayerName}>Update</button>
     </div>
   );
 }

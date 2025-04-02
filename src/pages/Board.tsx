@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
 
 interface ClueData {
@@ -20,7 +20,7 @@ export default function Board() {
   const navigate = useNavigate();
 
   
-  const [activeRound, setActiveRound] = useState<number>(1);
+  const [activeRound, _] = useState<number>(1);
   const [categories, setCategories] = useState<string[]>([]);
   const [gameBoard, setGameBoard] = useState<CategoryData[]>([]);
   const [score, setScore] = useState<number>(0);

@@ -13,7 +13,7 @@ export default function Clue() {
     if (!clue) return;
     
     const userAnswer = answer.trim().toLowerCase();
-    const correctAnswer = clue.answer.toLowerCase();
+    const correctAnswer = clue.question.toLowerCase();
     
     // Check if the answer is correct (simplified matching)
     const isCorrect = 
