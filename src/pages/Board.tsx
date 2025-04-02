@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 
 interface ClueData {
   category: string;
@@ -23,8 +24,8 @@ export default function Board() {
   const [categories, setCategories] = useState<string[]>([]);
   const [gameBoard, setGameBoard] = useState<CategoryData[]>([]);
   const [score, setScore] = useState<number>(0);
-  const [ws, setWs] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
+  const [socket, setSocket] = useState<any>(null);
 
   const handleClueSelect = (categoryIndex: number, clueIndex: number): void => {
     const clue = gameBoard[categoryIndex].clues[clueIndex];
@@ -57,8 +58,8 @@ export default function Board() {
   };
 
   const sendMessage = (message: string) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ message }));
+    if (socket) {
+      socket.emit('playerMove', { message });
     }
   };
 
@@ -92,31 +93,20 @@ export default function Board() {
 
   useEffect(() => {
     // Connect to the WebSocket server
-    const socket = new WebSocket('wss://schmegettes.vercel.app/api/game');
+    const socketConnection = io('wss://schmegettes.vercel.app/api/game');
+    setSocket(socketConnection);
 
-    socket.onopen = () => {
-      console.log('Connected to WebSocket server');
-    };
+    socketConnection.on('connect', () => {
+      console.log('Connected to game server');
+    });
 
-    socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      setMessages((prevMessages) => [...prevMessages, message]);
-    };
-
-    socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    socket.onclose = () => {
-      console.log('Disconnected from WebSocket server');
-    };
-
-    // Store the WebSocket connection in state
-    setWs(socket);
+    socketConnection.on('updateGameState', (data) => {
+      setMessages((prevMessages) => [...prevMessages, data.message]);
+    });
 
     // Clean up on component unmount
     return () => {
-      if (socket) socket.close();
+      socketConnection.disconnect();
     };
   }, []);
 

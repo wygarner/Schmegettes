@@ -1,52 +1,42 @@
 // api/game.js
-import WebSocket from 'ws';
+import { Server } from 'socket.io';
 
-let wss; // WebSocket server instance
-const clients = new Set(); // Set to hold connected clients
+let io;
 
 export default function handler(req, res) {
   if (req.method === 'GET') {
-    if (!wss) {
-      // Create WebSocket server on first request
-      wss = new WebSocket.Server({ noServer: true });
+    if (!io) {
+      // Initialize Socket.io server only once
+      io = new Server(res.socket.server);
 
-      wss.on('connection', (socket) => {
-        clients.add(socket);
+      // Listen for connections
+      io.on('connection', (socket) => {
         console.log('Player connected');
 
-        // Broadcast a message when a new player connects
-        socket.send(JSON.stringify({ message: 'Welcome to the game!' }));
-
         // Handle messages from clients
-        socket.on('message', (message) => {
-          console.log('Received message:', message);
-
-          // Broadcast received message to all clients
-          clients.forEach((client) => {
-            if (client !== socket && client.readyState === client.OPEN) {
-              client.send(message);
-            }
-          });
+        socket.on('playerMove', (data) => {
+          console.log('Player move:', data);
+          // Broadcast to all connected clients
+          io.emit('updateGameState', { message: 'Game state updated!' });
         });
 
         // Handle player disconnect
-        socket.on('close', () => {
-          clients.delete(socket);
+        socket.on('disconnect', () => {
           console.log('Player disconnected');
         });
       });
     }
 
-    // Upgrade HTTP request to WebSocket connection
+    // Required for the WebSocket connection to work
     res.socket.server.on('upgrade', (request, socket, head) => {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
+      io.handleUpgrade(request, socket, head, (socket) => {
+        io.emit('connection', socket, request);
       });
     });
 
-    return res.status(200).end('WebSocket server running');
+    // Return response (required by Vercel)
+    res.status(200).send('Socket.io server running');
+  } else {
+    res.status(405).end('Method Not Allowed');
   }
-
-  // Return a 405 error for non-GET methods
-  return res.status(405).end('Method Not Allowed');
 }
