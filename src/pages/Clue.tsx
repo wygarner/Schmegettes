@@ -4,8 +4,6 @@ import { useLocation } from 'react-router-dom';
 export default function Clue() {
   const { state: { clue }} = useLocation() as { state: { clue: any } };
 
-  console.log(clue);
-
   const [answer, setAnswer] = useState<string>('');
   const [message, setMessage] = useState<string>('');
 

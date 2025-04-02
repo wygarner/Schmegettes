@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useWebSocket } from '../context/WebSocketContext';
 
 interface Clue {
   round: number;
@@ -12,6 +13,7 @@ interface Clue {
   notes: string;
   isDailyDouble: boolean;
   isFinalJeopardy: boolean;
+  id: string;
 }
 
 interface QuestionGroup {
@@ -19,25 +21,57 @@ interface QuestionGroup {
   clues: Clue[];
 }
 
+interface Player {
+  name: string;
+  id: string;
+  score: number;
+}
+
 const TSV_BASE_URL = "https://raw.githubusercontent.com/wygarner/jeopardy_clue_dataset/refs/heads/main/seasons";
 
 export default function Lobby() {
   const [searchParams] = useSearchParams();
-  const gameId = searchParams.get('gameId');
-  const [questions, setQuestions] = useState<QuestionGroup[]>([]);
-  const [players, setPlayers] = useState<string[]>(['Player 1', 'Player 2']);
-  const [selectedSeason, setSelectedSeason] = useState<string>('season1');
-  const [playerName, setPlayerName] = useState<string>('');
   const navigate = useNavigate();
+  const gameId = searchParams.get('gameId');
+  const socket = useWebSocket();
 
+  const [questions, setQuestions] = useState<QuestionGroup[]>([]);
+  const [selectedSeason, setSelectedSeason] = useState<string>('season1');
   const [selectedAirDate, setSelectedAirDate] = useState<string | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+
+  // Find selected questions
+  const selectedClues = questions.find(q => q.airDate === selectedAirDate)?.clues || [];
+
+  const joinGame = () => {
+    if (!socket) return;
+
+    const playerName = (document.getElementById('player-name') as HTMLInputElement).value;
+    if (!playerName) {
+      console.error('Player name is required');
+      return;
+    }
+    socket.send(JSON.stringify({ type: 'joinGame', gameId, playerName }));
+    (document.getElementById('player-name') as HTMLInputElement).value = '';
+  };
+
+  const startGame = () => {
+    if (!selectedClues.length) {
+      console.error('No clues selected');
+      return;
+    }
+    if (!socket) return;
+    socket.send(JSON.stringify({ type: 'startGame', gameId, clues: selectedClues, activeRound: 1 }));
+    navigate(`/board?gameId=${gameId}`);
+  };
+
+  const handleSeasonChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedSeason(event.target.value);
+  };
 
   const handleSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedAirDate(event.target.value);
   };
-
-  // Find selected questions
-  const selectedClues = questions.find(q => q.airDate === selectedAirDate)?.clues || [];
 
   useEffect(() => {
     if (!selectedSeason) return;
@@ -64,6 +98,7 @@ export default function Lobby() {
             notes: row[8],
             isDailyDouble: Number(row[2]) > 0,
             isFinalJeopardy: row[0] === '3',
+            id: Math.random().toString(36).substring(2, 15), // Generate a random ID
           }));
   
         // Group by airDate
@@ -87,36 +122,32 @@ export default function Lobby() {
   }, [selectedSeason]);
 
   useEffect(() => {
-    // Simulate fetching players for the game
-    console.log(`Fetching players for game ${gameId}`);
-  }, [gameId]);
+    if (socket?.readyState == 1) {
+      socket.onmessage = (event: { data: string; }) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'game') {
+          if (data?.game?.active == true) {
+            navigate(`/board?gameId=${gameId}`);
+          }
+          setPlayers(data?.game?.players || []);
+        }
+      };
+    };
+  }, [socket?.readyState]);
 
-  const updatePlayerName = () => {
-    if (playerName.trim() !== '') {
-      setPlayers((prevPlayers) => [...prevPlayers, playerName]);
-      setPlayerName('');
+  useEffect(() => {
+    if (socket?.readyState == 1 && gameId) {
+      try {
+        socket.send(JSON.stringify({ type: 'getGame', gameId }));
+      } catch (error) {
+        console.error('Error sending message:', error);
+      }
     }
-  };
-
-  const startGame = () => {
-    console.log('Game Started!');
-    if (!selectedClues.length) {
-      console.error('No clues selected');
-      return;
-    }
-    navigate('/board', { state: { clues: selectedClues } });
-  };
-
-  const handleSeasonChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedSeason(event.target.value);
-  };
-
-  console.log('selected clues', selectedClues);
+  }, [socket?.readyState, gameId]);
 
   return (
     <div>
       <h1>Lobby</h1>
-
       <label htmlFor="season-select">Select a Season:</label>
       <select id="season-select" value={selectedSeason} onChange={handleSeasonChange}>
         <option value="" disabled>Select a season</option>
@@ -140,12 +171,12 @@ export default function Lobby() {
       <h2>Players in Lobby:</h2>
       <ul>
         {players.map((player, index) => (
-          <li key={index}>{player}</li>
+          <li key={index}>{player?.name}</li>
         ))}
       </ul>
-      <label htmlFor="player-name">Change Player Name:</label>
+      <label htmlFor="player-name">Enter Player Name:</label>
       <input id="player-name" type="text" placeholder="Enter your name" />
-      <button onClick={updatePlayerName}>Update</button>
+      <button onClick={joinGame}>Join</button>
     </div>
   );
 }

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useWebSocket } from '../context/WebSocketContext';
 
 interface Game {
   id: string;
@@ -7,33 +8,37 @@ interface Game {
 }
 
 export default function Home() {
-  const [games, setGames] = useState<Game[]>([
-    { id: '1', name: 'Game 1' },
-    { id: '2', name: 'Game 2' }
-  ]);
-
+  const [games, setGames] = useState<Game[]>([]);
   const navigate = useNavigate();
+  const socket = useWebSocket(); // Access WebSocket from context
 
   const createGame = () => {
-    const newGame: Game = {
-      id: (games.length + 1).toString(),
-      name: `Game ${games.length + 1}`
-    };
-    setGames([...games, newGame]);
+    if (socket) {
+      socket.send(JSON.stringify({ type: 'createGame' }));
+    }
   };
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.onmessage = (event: { data: string; }) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'gamesList') {
+        setGames(data.games);
+      }
+    };
+  }, [socket]);
 
   return (
     <div>
       <h1>Available Games</h1>
-      <ul>
         {games.map((game) => (
-          <li key={game.id}>
-            <button onClick={() => navigate(`/lobby?gameId=${game.id}`)}>
-              Join {game.name}
+          <div style={{ marginBottom: '10px' }} key={game.id}>
+            <button key={game.id} onClick={() => navigate(`/lobby?gameId=${game.id}`)}>
+              Go To {game.id} Lobby
             </button>
-          </li>
+          </div>
         ))}
-      </ul>
       <button onClick={createGame}>Create Game</button>
     </div>
   );
