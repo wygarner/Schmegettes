@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 
 interface ClueData {
   category: string;
@@ -19,11 +20,12 @@ export default function Board() {
   const { state: { clues }} = useLocation() as { state: { clues: ClueData[] } };
   const navigate = useNavigate();
 
-  
   const [activeRound, _] = useState<number>(1);
   const [categories, setCategories] = useState<string[]>([]);
   const [gameBoard, setGameBoard] = useState<CategoryData[]>([]);
   const [score, setScore] = useState<number>(0);
+  const [messages, setMessages] = useState<string[]>([]);
+  const [socket, setSocket] = useState<any>(null);
 
   const handleClueSelect = (categoryIndex: number, clueIndex: number): void => {
     const clue = gameBoard[categoryIndex].clues[clueIndex];
@@ -55,6 +57,12 @@ export default function Board() {
     setScore(0);
   };
 
+  const sendMessage = (message: string) => {
+    if (socket) {
+      socket.emit('playerMove', { message });
+    }
+  };
+
   useEffect(() => {
     const cluesByRound: { [key: number]: ClueData[] } = clues.reduce((acc, clue) => {
       const round = clue.round || 1; // Default to round 1 if not specified
@@ -83,6 +91,27 @@ export default function Board() {
 
   }, [activeRound, clues]);
 
+  useEffect(() => {
+    // Connect to the WebSocket server
+    const socketConnection = io('https://schmegettes.vercel.app/api/game', {
+      transports: ['websocket'], // You can also specify 'polling' if WebSocket isn't available
+    });
+    setSocket(socketConnection);
+
+    socketConnection.on('connect', () => {
+      console.log('Connected to game server');
+    });
+
+    socketConnection.on('updateGameState', (data) => {
+      setMessages((prevMessages) => [...prevMessages, data.message]);
+    });
+
+    // Clean up on component unmount
+    return () => {
+      socketConnection.disconnect();
+    };
+  }, []);
+
   return (
       <div className="jeopardy-container">
         <div className="jeopardy-header">
@@ -109,11 +138,21 @@ export default function Board() {
             ))}
           </div>
         </div>
+        <div>
+          {messages.map((msg, idx) => (
+            <p key={idx}>{msg}</p>
+          ))}
+        </div>
         <div className="reset-container">
           <button
             onClick={resetGame}
           >
             Reset Game
+          </button>
+          <button
+            onClick={() => sendMessage('Hello from the game board!')}
+          >
+            Send Message
           </button>
         </div>
       </div>
