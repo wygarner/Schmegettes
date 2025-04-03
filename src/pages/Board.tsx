@@ -116,7 +116,7 @@ export default function Board() {
       </div>
       <div className="players-container">
         {players.map((player: any, index: number) => (
-          <div key={index} className="player-card">
+          <div key={index} className={`player-card ${player.isTurn ? 'active-turn' : ''}`}>
             <h2>{player.name}</h2>
             <p>Score: {player.score}</p>
           </div>

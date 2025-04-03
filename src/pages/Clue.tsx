@@ -1,6 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import nlp from 'compromise';
 import { useWebSocket } from '../context/WebSocketContext';
+import getInterrogativeAndVerb from '../utils/getInterrogativeAndVerb';
+import levenshteinDistance from '../utils/levenshteinDistance';
 
 export default function Clue() {
   const { state: { clue }} = useLocation() as { state: { clue: any } };
@@ -14,32 +17,66 @@ export default function Clue() {
   const [message, setMessage] = useState<string>('');
 
   const handleAnswerSubmit = (): void => {
-    if (!clue) return;
-    
+    if (!clue || !answer) return;
+
     const userAnswer = answer.trim().toLowerCase();
     const correctAnswer = clue.question.toLowerCase();
-    
-    // Check if the answer is correct (simplified matching)
-    const isCorrect = 
-      userAnswer === correctAnswer || 
-      correctAnswer.includes(userAnswer) || 
-      userAnswer.includes(correctAnswer);
-    
+
+    // Normalize both answers using Compromise to extract key components
+    const userAnswerDoc = nlp(userAnswer);
+    const correctAnswerDoc = nlp(correctAnswer);
+
+    // Extract the key components (nouns, verbs, etc.) from the answers
+    const userAnswerKeywords = userAnswerDoc
+      .match('#Noun+')
+      .out('array')
+      .join(' ')
+      .trim();
+
+    const correctAnswerKeywords = correctAnswerDoc
+      .match('#Noun+')
+      .out('array')
+      .join(' ')
+      .trim();
+
+    // Ensure the answer starts with "What is" or "Who is"
+    const isQuestionFormat = userAnswer.startsWith("what is") || userAnswer.startsWith("who is") || userAnswer.startsWith("what are") || userAnswer.startsWith("who are");
+
+    if (!isQuestionFormat) {
+      const synth = window.speechSynthesis;
+      const utterance = new SpeechSynthesisUtterance("Your answer must be in the form of a question.");
+      synth.speak(utterance);
+      setMessage("Your answer must be in the form of a question, e.g., 'What is...'");
+      return;
+    }
+
+    // Compare using Levenshtein distance for fuzzy matching
+    const distance = levenshteinDistance(userAnswerKeywords, correctAnswerKeywords);
+
+    // If distance is within a small threshold, consider it a correct answer
+    const isCorrect = distance <= 3; // You can adjust the threshold here
+
     if (isCorrect) {
       if (!socket) return;
-      socket.send(JSON.stringify({ type: 'updatePlayerScore', gameId, playerId, score: clue.value }));
+      socket.send(JSON.stringify({ type: "updatePlayerScore", gameId, playerId, score: clue.value }));
       setMessage(`Correct! You earned ${clue.value} points.`);
     } else {
       if (!socket) return;
-      socket.send(JSON.stringify({ type: 'updatePlayerScore', gameId, playerId, score: -clue.value }));
-      setMessage(`Sorry, the correct answer was "${clue.question}". You lost ${clue.value} points.`);
-    }
+      socket.send(JSON.stringify({ type: "updatePlayerScore", gameId, playerId, score: -clue.value }));
+      socket.send(JSON.stringify({ type: "endPlayerTurn", gameId, playerId }));
+      
+      // Use getInterrogativeAndVerb to format the answer properly
+      const interrogativeAndVerb = getInterrogativeAndVerb(clue.question);
+      setMessage(`Sorry, we were looking for "${interrogativeAndVerb} ${clue.question}". You lost ${clue.value} points.`);
 
-    setTimeout(() => {
-      navigate(`/board?gameId=${gameId}&playerId=${playerId}`);
+      // Text-to-Speech for the correct answer
+      const synth = window.speechSynthesis;
+      const utterance = new SpeechSynthesisUtterance(`Sorry, we were looking for "${interrogativeAndVerb} ${clue.question}".`);
+      synth.speak(utterance);
     }
-    , 3000);
   };
+  
+  
 
   const handleVoiceInput = () => {
     const SpeechRecognition =
@@ -51,7 +88,6 @@ export default function Clue() {
     }
   
     const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
   
@@ -71,6 +107,14 @@ export default function Clue() {
   
     recognition.start();
   };
+
+  useEffect(() => {
+    if (clue?.answer) {
+      const synth = window.speechSynthesis;
+      const utterance = new SpeechSynthesisUtterance(clue.answer);
+      synth.speak(utterance);
+    }
+  }, [clue]);
 
   return (
     <div className="clue-container">
@@ -104,3 +148,9 @@ export default function Clue() {
     </div>
   )
 }
+
+
+    // setTimeout(() => {
+    //   navigate(`/board?gameId=${gameId}&playerId=${playerId}`);
+    // }
+    // , 3000);

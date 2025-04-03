@@ -31,7 +31,9 @@ export default function Home() {
 
   return (
     <div>
-      <h1>Available Games</h1>
+      <h1>Answer: Schmegettes!</h1>
+      <h1>Question: ...What is Schmegettes?</h1>
+      <h3>Available Games</h3>
         {games.map((game) => (
           <div style={{ marginBottom: '10px' }} key={game.id}>
             <button key={game.id} onClick={() => navigate(`/lobby?gameId=${game.id}`)}>

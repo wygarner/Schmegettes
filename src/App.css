@@ -148,3 +148,17 @@
   justify-content: center;
   gap: 1rem;
 }
+
+.player-card {
+  background-color: #1e40af; /* bg-blue-800 */
+  padding: 1rem;
+  border-radius: 0.5rem;
+  width: 100%;
+  max-width: 20rem;
+}
+
+.player-card.active-turn {
+  border-color: red; /* Highlight the active player's turn */
+  border-width: 2px;
+  border-style: solid;
+}
