@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWebSocket } from '../context/WebSocketContext';
+import { useFingerprint } from '../context/FingerprintContext';
 
 interface Clue {
   round: number;
@@ -31,17 +32,18 @@ interface Player {
 const TSV_BASE_URL = "https://raw.githubusercontent.com/wygarner/jeopardy_clue_dataset/refs/heads/main/seasons";
 
 export default function Lobby() {
+  const socket = useWebSocket();
+  const fingerprint = useFingerprint();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const gameId = searchParams.get('gameId');
-  const [playerId, setPlayerId] = useState(searchParams.get('playerId'));
-  const socket = useWebSocket();
 
   const [questions, setQuestions] = useState<QuestionGroup[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<string>('season1');
   const [selectedAirDate, setSelectedAirDate] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [isGameActive, setIsGameActive] = useState<boolean>(false);
+  const [playerId, setPlayerId] = useState(searchParams.get('playerId'));
 
   // Find selected questions
   const selectedClues = questions.find(q => q.airDate === selectedAirDate)?.clues || [];
@@ -54,7 +56,7 @@ export default function Lobby() {
       console.error('Player name is required');
       return;
     }
-    socket.send(JSON.stringify({ type: 'joinGame', gameId, playerName }));
+    socket.send(JSON.stringify({ type: 'joinGame', gameId, playerName, fingerprint: fingerprint.fingerprint }));
     (document.getElementById('player-name') as HTMLInputElement).value = '';
   };
 
@@ -129,14 +131,6 @@ export default function Lobby() {
     if (socket?.readyState == 1) {
       socket.onmessage = (event: { data: string; }) => {
         const data = JSON.parse(event.data);
-        if (data.type === 'joinedGame') {
-          const { player } = data;
-          // add player id to url search params
-          const url = new URL(window.location.href);
-          url.searchParams.set('playerId', player.id);
-          window.history.pushState({}, '', url);
-          setPlayerId(player.id);
-        };
         if (data.type === 'game') {
           setPlayers(data?.game?.players || []);
           setIsGameActive(data?.game?.active || false);
@@ -154,6 +148,17 @@ export default function Lobby() {
       }
     }
   }, [socket?.readyState, gameId]);
+
+  useEffect(() => {
+    if (fingerprint.fingerprint) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('playerId', fingerprint.fingerprint);
+      window.history.pushState({}, '', url);
+      setPlayerId(fingerprint.fingerprint);
+    }
+  }, [fingerprint]);
+
+  const fingerprintInPlayers = players.some(player => player.id === fingerprint.fingerprint);
 
   return (
     <div>
@@ -191,7 +196,7 @@ export default function Lobby() {
           <li key={index}>{player?.name}</li>
         ))}
       </ul>
-      {!playerId && (
+      {!fingerprintInPlayers && (
         <div>
           <label htmlFor="player-name">Enter Player Name:</label>
           <input id="player-name" type="text" placeholder="Enter your name" />

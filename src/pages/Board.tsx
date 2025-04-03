@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWebSocket } from '../context/WebSocketContext';
 
 interface ClueData {
@@ -31,7 +31,6 @@ export default function Board() {
 
   const handleClueSelect = (clue: any): void => {
     if (!socket) return;
-    console.log('clue', clue);
     socket.send(JSON.stringify({ type: 'clearClue', clueId: clue.id, gameId }));
 
     navigate(`/clue?gameId=${gameId}&playerId=${playerId}`, { state: { clue } });
@@ -42,7 +41,6 @@ export default function Board() {
       socket.onmessage = (event: { data: string; }) => {
         const data = JSON.parse(event.data);
         if (data.type === 'game') {
-          console.log('game', data);
           const {
             players,
             activeRound,
@@ -88,6 +86,8 @@ export default function Board() {
       }
     }
   }, [socket?.readyState, gameId]);
+
+  console.log('game board', gameBoard);
 
   return (
     <div className="jeopardy-container">

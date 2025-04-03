@@ -142,3 +142,9 @@
   margin-top: 1rem;
   text-align: center;
 }
+
+.players-container {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
