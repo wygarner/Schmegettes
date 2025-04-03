@@ -1,8 +1,14 @@
 import React, { useState } from 'react'
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useWebSocket } from '../context/WebSocketContext';
 
 export default function Clue() {
   const { state: { clue }} = useLocation() as { state: { clue: any } };
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const gameId = searchParams.get('gameId');
+  const playerId = searchParams.get('playerId');
+  const socket = useWebSocket();
 
   const [answer, setAnswer] = useState<string>('');
   const [message, setMessage] = useState<string>('');
@@ -20,10 +26,19 @@ export default function Clue() {
       userAnswer.includes(correctAnswer);
     
     if (isCorrect) {
+      if (!socket) return;
+      socket.send(JSON.stringify({ type: 'updatePlayerScore', gameId, playerId, score: clue.value }));
       setMessage(`Correct! You earned ${clue.value} points.`);
     } else {
-      setMessage(`Sorry, the correct answer was "${clue.answer}". You lost ${clue.value} points.`);
+      if (!socket) return;
+      socket.send(JSON.stringify({ type: 'updatePlayerScore', gameId, playerId, score: -clue.value }));
+      setMessage(`Sorry, the correct answer was "${clue.question}". You lost ${clue.value} points.`);
     }
+
+    setTimeout(() => {
+      navigate(`/board?gameId=${gameId}&playerId=${playerId}`);
+    }
+    , 3000);
   };
 
   const handleVoiceInput = () => {

@@ -14,6 +14,7 @@ interface Clue {
   isDailyDouble: boolean;
   isFinalJeopardy: boolean;
   id: string;
+  active: boolean;
 }
 
 interface QuestionGroup {
@@ -33,12 +34,14 @@ export default function Lobby() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const gameId = searchParams.get('gameId');
+  const [playerId, setPlayerId] = useState(searchParams.get('playerId'));
   const socket = useWebSocket();
 
   const [questions, setQuestions] = useState<QuestionGroup[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<string>('season1');
   const [selectedAirDate, setSelectedAirDate] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [isGameActive, setIsGameActive] = useState<boolean>(false);
 
   // Find selected questions
   const selectedClues = questions.find(q => q.airDate === selectedAirDate)?.clues || [];
@@ -62,7 +65,7 @@ export default function Lobby() {
     }
     if (!socket) return;
     socket.send(JSON.stringify({ type: 'startGame', gameId, clues: selectedClues, activeRound: 1 }));
-    navigate(`/board?gameId=${gameId}`);
+    navigate(`/board?gameId=${gameId}&playerId=${playerId}`);
   };
 
   const handleSeasonChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -99,6 +102,7 @@ export default function Lobby() {
             isDailyDouble: Number(row[2]) > 0,
             isFinalJeopardy: row[0] === '3',
             id: Math.random().toString(36).substring(2, 15), // Generate a random ID
+            active: true,
           }));
   
         // Group by airDate
@@ -125,11 +129,17 @@ export default function Lobby() {
     if (socket?.readyState == 1) {
       socket.onmessage = (event: { data: string; }) => {
         const data = JSON.parse(event.data);
+        if (data.type === 'joinedGame') {
+          const { player } = data;
+          // add player id to url search params
+          const url = new URL(window.location.href);
+          url.searchParams.set('playerId', player.id);
+          window.history.pushState({}, '', url);
+          setPlayerId(player.id);
+        };
         if (data.type === 'game') {
-          if (data?.game?.active == true) {
-            navigate(`/board?gameId=${gameId}`);
-          }
           setPlayers(data?.game?.players || []);
+          setIsGameActive(data?.game?.active || false);
         }
       };
     };
@@ -148,35 +158,46 @@ export default function Lobby() {
   return (
     <div>
       <h1>Lobby</h1>
-      <label htmlFor="season-select">Select a Season:</label>
-      <select id="season-select" value={selectedSeason} onChange={handleSeasonChange}>
-        <option value="" disabled>Select a season</option>
-        {Array.from({ length: 40 }, (_, i) => (
-          <option key={i + 1} value={`season${i + 1}`}>
-            Season {i + 1}
-          </option>
-        ))}
-      </select>
-      <label>Select a game:</label>
-      <select onChange={handleSelectChange} value={selectedAirDate || ""}>
-        <option value="">Select a date</option>
-        {questions.map((q) => (
-          <option key={q.airDate} value={q.airDate}>
-            {q.airDate}
-          </option>
-        ))}
-      </select>
-      <button onClick={startGame}>Start Game</button>
-
+      {isGameActive ? (
+        <div>
+          <button onClick={() => navigate(`/board?gameId=${gameId}&playerId=${playerId}`)}>Enter Game</button>
+        </div>
+      ) : (
+        <div>
+          <label htmlFor="season-select">Select a Season:</label>
+          <select id="season-select" value={selectedSeason} onChange={handleSeasonChange}>
+            <option value="" disabled>Select a season</option>
+            {Array.from({ length: 40 }, (_, i) => (
+              <option key={i + 1} value={`season${i + 1}`}>
+                Season {i + 1}
+              </option>
+            ))}
+          </select>
+          <label>Select a game:</label>
+          <select onChange={handleSelectChange} value={selectedAirDate || ""}>
+            <option value="">Select a date</option>
+            {questions.map((q) => (
+              <option key={q.airDate} value={q.airDate}>
+                {q.airDate}
+              </option>
+            ))}
+          </select>
+          <button onClick={startGame}>Start Game</button>
+        </div>
+      )}
       <h2>Players in Lobby:</h2>
       <ul>
         {players.map((player, index) => (
           <li key={index}>{player?.name}</li>
         ))}
       </ul>
-      <label htmlFor="player-name">Enter Player Name:</label>
-      <input id="player-name" type="text" placeholder="Enter your name" />
-      <button onClick={joinGame}>Join</button>
+      {!playerId && (
+        <div>
+          <label htmlFor="player-name">Enter Player Name:</label>
+          <input id="player-name" type="text" placeholder="Enter your name" />
+          <button onClick={joinGame}>Join</button>
+        </div>
+      )}
     </div>
   );
 }

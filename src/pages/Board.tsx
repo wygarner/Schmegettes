@@ -7,7 +7,7 @@ interface ClueData {
   value: number;
   question: string;
   answer: string;
-  used?: boolean;
+  active?: boolean;
   round?: number;
   id: string;
 }
@@ -20,6 +20,7 @@ interface CategoryData {
 export default function Board() {
   const [searchParams] = useSearchParams();
   const gameId = searchParams.get('gameId');
+  const playerId = searchParams.get('playerId');
   const navigate = useNavigate();
   const socket = useWebSocket();
 
@@ -28,24 +29,12 @@ export default function Board() {
   const [players, setPlayers] = useState<any[]>([]);
   const [activeRound, setActiveRound] = useState<number>(1);
 
-  const handleClueSelect = (categoryIndex: number, clueIndex: number): void => {
-    const clue = gameBoard[categoryIndex].clues[clueIndex];
-    // Mark the clue as used by creating a new game board with this clue marked
-    const newGameBoard = [...gameBoard];
-    if (newGameBoard[categoryIndex].clues[clueIndex].used) return; // Already used
-    
-    newGameBoard[categoryIndex].clues[clueIndex] = {
-      ...newGameBoard[categoryIndex].clues[clueIndex],
-      used: true
-    };
-
+  const handleClueSelect = (clue: any): void => {
     if (!socket) return;
-    socket.send(JSON.stringify({ type: 'clearClue', clueId: clue.id }));
+    console.log('clue', clue);
+    socket.send(JSON.stringify({ type: 'clearClue', clueId: clue.id, gameId }));
 
-    // Navigate to the clue page with the clue data
-    // navigate('/clue', { state: { clue } });
-    
-    // setGameBoard(newGameBoard);
+    navigate(`/clue?gameId=${gameId}&playerId=${playerId}`, { state: { clue } });
   };
 
   useEffect(() => {
@@ -115,10 +104,10 @@ export default function Board() {
               {gameBoard[categoryIndex].clues.map((clue, clueIndex) => (
                 <div 
                   key={clueIndex}
-                  onClick={() => handleClueSelect(categoryIndex, clueIndex)}
+                  onClick={() => handleClueSelect(clue)}
                   className={`clue-cell`}
                 >
-                  {clue.used ? '' : `$${clue.value}`}
+                  {!clue.active ? '' : `$${clue.value}`}
                 </div>
               ))}
             </div>
