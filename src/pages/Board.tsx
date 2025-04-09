@@ -152,6 +152,7 @@ export default function Board() {
   }, [socket?.readyState]);
 
   useEffect(() => {
+    console.log('socket readyState:', socket?.readyState);
     if (socket?.readyState == 1 && gameId) {
       try {
         socket.send(JSON.stringify({ type: 'getGame', gameId }));
@@ -164,7 +165,7 @@ export default function Board() {
   return (
     <div className="jeopardy-container">
       <div className="jeopardy-header">
-        <h1 className="jeopardy-title">SCHMEGETTES!</h1>
+        <h1 className="jeopardy-title">Schmegettes!</h1>
       </div>
       <div className="board-container">
         <div className="game-board">

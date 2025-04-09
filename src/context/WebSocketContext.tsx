@@ -10,11 +10,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const ws = new WebSocket('ws://localhost:3000');
 
 
-    ws.onopen = () => console.log('Connected to WebSocket server');
+    ws.onopen = () => {
+      console.log('Connected to WebSocket server')
+      setSocket(ws);
+    };
     ws.onclose = () => console.log('Disconnected from WebSocket server');
     ws.onerror = (error) => console.error('WebSocket error:', error);
-
-    setSocket(ws);
 
     return () => {
       ws.close();
