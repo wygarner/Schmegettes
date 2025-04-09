@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import nlp from 'compromise';
 import { useWebSocket } from '../context/WebSocketContext';
@@ -6,17 +6,20 @@ import getInterrogativeAndVerb from '../utils/getInterrogativeAndVerb';
 import levenshteinDistance from '../utils/levenshteinDistance';
 
 export default function Clue() {
-  const { state: { clue }} = useLocation() as { state: { clue: any } };
+  const { state: { clue, players }} = useLocation() as { state: { clue: any, players: any } };
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const gameId = searchParams.get('gameId');
   const playerId = searchParams.get('playerId');
   const socket = useWebSocket();
+  const synth = window.speechSynthesis;
 
   const [answer, setAnswer] = useState<string>('');
   const [message, setMessage] = useState<string>('');
+  const [activePlayers, setActivePlayers] = useState<any[]>(players);
 
-  const handleAnswerSubmit = (): void => {
+  const handleAnswerSubmit = (answer: string): void => {
+    console.log("Answer submitted:", answer);
     if (!clue || !answer) return;
 
     const userAnswer = answer.trim().toLowerCase();
@@ -43,7 +46,6 @@ export default function Clue() {
     const isQuestionFormat = userAnswer.startsWith("what is") || userAnswer.startsWith("who is") || userAnswer.startsWith("what are") || userAnswer.startsWith("who are");
 
     if (!isQuestionFormat) {
-      const synth = window.speechSynthesis;
       const utterance = new SpeechSynthesisUtterance("Your answer must be in the form of a question.");
       synth.speak(utterance);
       setMessage("Your answer must be in the form of a question, e.g., 'What is...'");
@@ -54,23 +56,27 @@ export default function Clue() {
     const distance = levenshteinDistance(userAnswerKeywords, correctAnswerKeywords);
 
     // If distance is within a small threshold, consider it a correct answer
-    const isCorrect = distance <= 3; // You can adjust the threshold here
+    const isCorrect = distance <= 2; // You can adjust the threshold here
+
+    const interrogativeAndVerb = getInterrogativeAndVerb(clue.question);
 
     if (isCorrect) {
       if (!socket) return;
       socket.send(JSON.stringify({ type: "updatePlayerScore", gameId, playerId, score: clue.value }));
-      setMessage(`Correct! You earned ${clue.value} points.`);
+      socket.send(JSON.stringify({ type: "requalifyAllPlayers", gameId }));
+      setMessage(`Correct! The answer is "${interrogativeAndVerb} ${clue.question}". You earned ${clue.value} points.`);
+      const utterance = new SpeechSynthesisUtterance(`Correct! The answer is "${interrogativeAndVerb} ${clue.question}". You earned ${clue.value} points.`);
+      synth.speak(utterance);
+      setTimeout(() => {
+        navigate(`/board?gameId=${gameId}&playerId=${playerId}`);
+      }
+      , 5000);
     } else {
       if (!socket) return;
       socket.send(JSON.stringify({ type: "updatePlayerScore", gameId, playerId, score: -clue.value }));
+      socket.send(JSON.stringify({ type: "disqualifyPlayer", gameId, playerId }));
       socket.send(JSON.stringify({ type: "endPlayerTurn", gameId, playerId }));
-      
-      // Use getInterrogativeAndVerb to format the answer properly
-      const interrogativeAndVerb = getInterrogativeAndVerb(clue.question);
       setMessage(`Sorry, we were looking for "${interrogativeAndVerb} ${clue.question}". You lost ${clue.value} points.`);
-
-      // Text-to-Speech for the correct answer
-      const synth = window.speechSynthesis;
       const utterance = new SpeechSynthesisUtterance(`Sorry, we were looking for "${interrogativeAndVerb} ${clue.question}".`);
       synth.speak(utterance);
     }
@@ -98,7 +104,7 @@ export default function Clue() {
     recognition.onresult = (event: any) => {
       const spokenText = event.results[0][0].transcript;
       setAnswer(spokenText);
-      setMessage(`You said: "${spokenText}"`);
+      handleAnswerSubmit(spokenText);
     };
   
     recognition.onerror = (event: any) => {
@@ -110,47 +116,51 @@ export default function Clue() {
 
   useEffect(() => {
     if (clue?.answer) {
-      const synth = window.speechSynthesis;
       const utterance = new SpeechSynthesisUtterance(clue.answer);
       synth.speak(utterance);
     }
   }, [clue]);
 
+  useEffect(() => {
+    if (socket?.readyState == 1) {
+      socket.onmessage = (event: { data: string; }) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'game') {
+          setActivePlayers(data?.game?.players || []);
+        }
+      };
+    }
+  }, [socket?.readyState]);
+
   return (
-    <div className="clue-container">
-      <div className="clue-card">
-        <div className="clue-header">{clue.category} - ${clue.value}</div>
-        <div className="clue-question">{clue.answer}</div>
-        <input
-          type="text"
-          value={answer}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAnswer(e.target.value)}
-          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleAnswerSubmit()}
-          placeholder="Your answer..."
-          className="clue-input"
-          disabled
-        />
-        <button
-          onClick={handleAnswerSubmit}
-          className="submit-button"
-        >
-          Submit Answer
-        </button>
-        <button onClick={handleVoiceInput} className="voice-button">
-          🎤 Speak Answer
-        </button>
-        {message && (
-          <div className="message">
-            {message}
+    <div>
+      <div className="clue-container">
+        <div className="clue-card">
+          <div className="clue-header">{clue.category} - ${clue.value}</div>
+          <div className="clue-question">{clue.answer}</div>
+          <button onClick={handleVoiceInput} className="voice-button">
+            🎤 Speak Answer
+          </button>
+          {answer && (
+            <div className="message">
+              You said: {answer}
+            </div>
+          )}
+          {message && (
+            <div className="message">
+              {message}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="players-container" style={{ marginTop: '80px' }}>
+        {activePlayers?.map((player: any, index: number) => (
+          <div key={index} className={`player-card`}>
+            <h2>{player.name}</h2>
+            <p>Score: {player.score}</p>
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
 }
-
-
-    // setTimeout(() => {
-    //   navigate(`/board?gameId=${gameId}&playerId=${playerId}`);
-    // }
-    // , 3000);
