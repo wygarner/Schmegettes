@@ -24,6 +24,7 @@ export default function Board() {
   const playerId = searchParams.get('playerId');
   const navigate = useNavigate();
   const socket = useWebSocket();
+  const synth = window.speechSynthesis;
 
   const [categories, setCategories] = useState<string[]>([]);
   const [gameBoard, setGameBoard] = useState<CategoryData[]>([]);
@@ -33,7 +34,11 @@ export default function Board() {
 
   const navigateToClue = (clue: ClueData, players: any) => {
     console.log('Navigating to clue:', clue, players);
-    navigate(`/clue?gameId=${gameId}&playerId=${playerId}`, { state: { clue, players } });
+    const utterance = new SpeechSynthesisUtterance(`Here is ${clue.category} for ${clue.value}.`);
+    synth.speak(utterance);
+    setTimeout(() => {
+      navigate(`/clue?gameId=${gameId}&playerId=${playerId}`, { state: { clue, players } });
+    }, 3500);
   }
 
   const handleClueSelect = (spokenText: string): void => {
@@ -51,7 +56,7 @@ export default function Board() {
     const spokenValue = parseInt(match[2]);
   
     let closestCategory = '';
-    let smallestDistance = Infinity;
+    let smallestDistance = 5;
   
     for (const category of categories) {
       const distance = levenshteinDistance(spokenCategory, category.toLowerCase());
@@ -67,7 +72,7 @@ export default function Board() {
     if (clue) {
       socket?.send(JSON.stringify({ type: 'clearClue', clueId: clue.id, gameId }));
     } else {
-      setMessage(`No active clue found for ${closestCategory} at $${spokenValue}`);
+      setMessage(`No active clue found for ${spokenCategory} at $${spokenValue}`);
     }
   };
   
@@ -102,8 +107,6 @@ export default function Board() {
   
     recognition.start();
   };
-
-  const currentPlayer = players.find((player: any) => player.id === playerId);
 
   useEffect(() => {
     if (socket?.readyState == 1) {
@@ -178,9 +181,6 @@ export default function Board() {
                 <div 
                   key={clueIndex}
                   className={`clue-cell`}
-                  style={{
-                    cursor: currentPlayer.isTurn && clue.active ? 'pointer' : 'not-allowed',
-                  }}
                 >
                   {!clue.active ? '' : `$${clue.value}`}
                 </div>
@@ -189,14 +189,14 @@ export default function Board() {
           ))}
         </div>
       </div>
-      {message && (
-        <div className="message">
-          {message}
-        </div>
-      )}
       <div className="players-container">
         {players.map((player: any, index: number) => (
           <div key={index} className={`player-card ${player.isTurn ? 'active-turn' : ''}`}>
+            {message && (
+              <div className="message">
+                {message}
+              </div>
+            )}
             <h2>{player.name}</h2>
             <p>Score: {player.score}</p>
             {player.isTurn && (

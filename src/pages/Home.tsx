@@ -19,15 +19,25 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!socket) return;
+    if (socket?.readyState == 1) {
+      socket.onmessage = (event: { data: string; }) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'gamesList') {
+          setGames(data.games);
+        }
+      };
+    }
+  }, [socket?.readyState]);
 
-    socket.onmessage = (event: { data: string; }) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'gamesList') {
-        setGames(data.games);
+  useEffect(() => {
+    if (socket?.readyState == 1) {
+      try {
+        socket.send(JSON.stringify({ type: 'getGamesList' }));
+      } catch (error) {
+        console.error('Error sending message:', error);
       }
-    };
-  }, [socket]);
+    }
+  }, [socket?.readyState]);
 
   return (
     <div>

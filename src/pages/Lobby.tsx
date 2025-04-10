@@ -61,10 +61,17 @@ export default function Lobby() {
   };
 
   const startGame = () => {
-    if (!selectedClues.length) {
+    console.log('Starting game with clues:', !selectedClues.length);
+    if (selectedClues.length === 0) {
       console.error('No clues selected');
       return;
     }
+
+    if (players.length === 0) {
+      console.error('No players in the game');
+      return;
+    }
+    
     if (!socket) return;
     socket.send(JSON.stringify({ type: 'startGame', gameId, clues: selectedClues, activeRound: 1 }));
     navigate(`/board?gameId=${gameId}&playerId=${playerId}`);

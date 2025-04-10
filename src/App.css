@@ -126,11 +126,6 @@
   justify-content: center;
   font-weight: bold;
   color: #fcd34d; /* text-yellow-300 */
-  cursor: pointer;
-}
-
-.clue-cell:hover {
-  background-color: #2563eb; /* bg-blue-600 */
 }
 
 .clue-cell.used {
